@@ -1,0 +1,11 @@
+# Use Oracle GraalVM native-image:21 as the base image
+FROM container-registry.oracle.com/graalvm/native-image:21
+
+# Set working directory to be compatible with Quarkus
+WORKDIR /project
+
+# Verify native-image is available
+RUN native-image --version
+
+# Default command (can be overridden by Quarkus)
+CMD ["/bin/bash"]
