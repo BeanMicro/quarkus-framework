@@ -1,11 +1,39 @@
-# Use Oracle GraalVM native-image:21 as the base image
-FROM container-registry.oracle.com/graalvm/native-image:21
+# Use the Quarkus UBI9 GraalVM CE builder image as the base
+FROM quay.io/quarkus/ubi9-quarkus-graalvmce-builder-image:jdk-21 AS build
 
-# Set working directory to be compatible with Quarkus
+# Switch to root for system-level operations
+USER root
+
+# Install additional tools if needed (e.g., tar, gzip)
+RUN microdnf install -y tar gzip && \
+    microdnf clean all
+
+# Uninstall GraalVM CE by removing the /opt/graalvm directory
+RUN rm -rf /opt/graalvm
+
+# Download Oracle GraalVM JDK 21 tarball
+RUN curl -L -o /tmp/graalvm-jdk-21_linux-x64_bin.tar.gz https://download.oracle.com/graalvm/21/latest/graalvm-jdk-21_linux-x64_bin.tar.gz
+
+# Install Oracle GraalVM JDK 21
+ENV JAVA_HOME=/opt/graalvm
+ENV PATH=$JAVA_HOME/bin:$PATH
+RUN mkdir -p /opt/graalvm && \
+    tar -xzf /tmp/graalvm-jdk-21_linux-x64_bin.tar.gz -C /opt/graalvm --strip-components=1 && \
+    rm /tmp/graalvm-jdk-21_linux-x64_bin.tar.gz
+
+# Verify Java and check if native-image is available
+# Oracle GraalVM may include native-image by default
+RUN java -version && \
+    if [ -f "$JAVA_HOME/bin/native-image" ]; then \
+        native-image --version; \
+    else \
+        echo "native-image not found, manual installation may be required"; \
+        exit 1; \
+    fi
+
+# Switch back to the quarkus user for compatibility with Quarkus build processes
+USER quarkus
 WORKDIR /project
 
-# Verify native-image is available
-RUN native-image --version
-
-# Default command (can be overridden by Quarkus)
-CMD ["/bin/bash"]
+# Keep the default entrypoint for Quarkus builds
+ENTRYPOINT ["native-image"]
